@@ -1,0 +1,18 @@
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      # Mount source code for hot reload
+      - .:/app
+      # Prevent host node_modules from overriding container's
+      - /app/node_modules
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - CEREBRAS_API_KEY=${CEREBRAS_API_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - NODE_ENV=development
+      # Enable polling so file changes on host are detected inside container
+      - WATCHPACK_POLLING=true
+      - CHOKIDAR_USEPOLLING=true

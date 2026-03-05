@@ -1,0 +1,26 @@
+node_modules
+.next
+out
+dist
+coverage
+*.log
+*.local
+.env
+
+# Generated files
+tsconfig.tsbuildinfo
+next-env.d.ts
+
+
+# Plans, docs, session files (non-code)
+*_PLAN.md
+*_DESIGN.md
+SESSION_HANDOFF.md
+reports/
+
+# Temp / scratch files
+*.tmp
+test_tmp.*
+test*.md
+
+
