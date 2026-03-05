@@ -174,7 +174,7 @@ async function generateWithOpenRouter(userPrompt: string): Promise<string> {
         headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${key}`,
-            "HTTP-Referer": process.env.NEXT_PUBLIC_SITE_URL ?? "https://organisasi.vercel.app",
+            "HTTP-Referer": process.env.NEXT_PUBLIC_SITE_URL ?? "https://rundown-bpm.vercel.app",
             "X-Title": "Rundown Builder AI",
         },
         body: JSON.stringify({
