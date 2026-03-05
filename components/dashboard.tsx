@@ -256,53 +256,90 @@ export function Dashboard() {
             Belum ada rundown. Buat pertama kali dari panel di atas.
           </p>
         ) : (
-          <div className="mt-4 overflow-x-auto">
-            <table className="min-w-full border-collapse text-left text-sm">
-              <thead>
-                <tr className="text-slate-600">
-                  <th className="border-b border-slate-200 px-3 py-2 font-semibold">Judul</th>
-                  <th className="border-b border-slate-200 px-3 py-2 font-semibold">Items</th>
-                  <th className="border-b border-slate-200 px-3 py-2 font-semibold">Update</th>
-                  <th className="border-b border-slate-200 px-3 py-2 font-semibold">Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rundowns.map((rundown) => (
-                  <tr key={rundown.id} className="text-slate-700">
-                    <td className="border-b border-slate-100 px-3 py-3 font-medium">{rundown.title}</td>
-                    <td className="border-b border-slate-100 px-3 py-3">{rundown.items.length}</td>
-                    <td className="border-b border-slate-100 px-3 py-3">
-                      {rundown.updatedAt.slice(0, 16).replace("T", " ")}
-                    </td>
-                    <td className="border-b border-slate-100 px-3 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <Link
-                          href={`/rundown/${rundown.id}`}
-                          className="rounded-lg bg-ink px-3 py-1.5 text-xs font-semibold text-white transition hover:brightness-110"
-                        >
-                          Buka
-                        </Link>
-                        <button
-                          type="button"
-                          onClick={() => onDuplicate(rundown.id)}
-                          className="rounded-lg bg-tide px-3 py-1.5 text-xs font-semibold text-white transition hover:brightness-110"
-                        >
-                          Duplikasi
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onDelete(rundown.id)}
-                          className="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:brightness-110"
-                        >
-                          Hapus
-                        </button>
-                      </div>
-                    </td>
+          <>
+            {/* Mobile: card list */}
+            <div className="mt-4 flex flex-col gap-3 sm:hidden">
+              {rundowns.map((rundown) => (
+                <div key={rundown.id} className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4">
+                  <p className="font-semibold text-slate-800">{rundown.title}</p>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    {rundown.items.length} item · Diperbarui {rundown.updatedAt.slice(0, 10)}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Link
+                      href={`/rundown/${rundown.id}`}
+                      className="flex-1 rounded-lg bg-ink px-3 py-2 text-center text-xs font-semibold text-white transition hover:brightness-110"
+                    >
+                      Buka
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => onDuplicate(rundown.id)}
+                      className="flex-1 rounded-lg bg-tide px-3 py-2 text-xs font-semibold text-white transition hover:brightness-110"
+                    >
+                      Duplikasi
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onDelete(rundown.id)}
+                      className="rounded-lg bg-rose-100 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-200"
+                    >
+                      Hapus
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop: table */}
+            <div className="mt-4 hidden overflow-x-auto sm:block">
+              <table className="min-w-full border-collapse text-left text-sm">
+                <thead>
+                  <tr className="text-slate-600">
+                    <th className="border-b border-slate-200 px-3 py-2 font-semibold">Judul</th>
+                    <th className="border-b border-slate-200 px-3 py-2 font-semibold">Items</th>
+                    <th className="border-b border-slate-200 px-3 py-2 font-semibold">Update</th>
+                    <th className="border-b border-slate-200 px-3 py-2 font-semibold">Aksi</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {rundowns.map((rundown) => (
+                    <tr key={rundown.id} className="text-slate-700">
+                      <td className="border-b border-slate-100 px-3 py-3 font-medium">{rundown.title}</td>
+                      <td className="border-b border-slate-100 px-3 py-3">{rundown.items.length}</td>
+                      <td className="border-b border-slate-100 px-3 py-3">
+                        {rundown.updatedAt.slice(0, 16).replace("T", " ")}
+                      </td>
+                      <td className="border-b border-slate-100 px-3 py-3">
+                        <div className="flex flex-wrap gap-2">
+                          <Link
+                            href={`/rundown/${rundown.id}`}
+                            className="rounded-lg bg-ink px-3 py-1.5 text-xs font-semibold text-white transition hover:brightness-110"
+                          >
+                            Buka
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => onDuplicate(rundown.id)}
+                            className="rounded-lg bg-tide px-3 py-1.5 text-xs font-semibold text-white transition hover:brightness-110"
+                          >
+                            Duplikasi
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onDelete(rundown.id)}
+                            className="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:brightness-110"
+                          >
+                            Hapus
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </section>
     </main>

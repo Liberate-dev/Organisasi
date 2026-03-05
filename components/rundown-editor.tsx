@@ -70,7 +70,6 @@ export function RundownEditor({ initialRundown }: RundownEditorProps) {
     setSaveState("saved");
   }
 
-  /** Update sebuah item tanpa sync rantai (untuk kolom non-waktu) */
   function updateItem(
     itemId: string,
     updater: (item: RundownItem) => RundownItem
@@ -81,7 +80,6 @@ export function RundownEditor({ initialRundown }: RundownEditorProps) {
     applyItems(nextItems);
   }
 
-  /** Update item lalu otomatis sinkron rantai waktu (untuk kolom durasi & mulai) */
   function updateItemAndSync(
     itemId: string,
     updater: (item: RundownItem) => RundownItem
@@ -129,7 +127,6 @@ export function RundownEditor({ initialRundown }: RundownEditorProps) {
   function duplicateRow(itemId: string) {
     const sourceIndex = rundown.items.findIndex((item) => item.id === itemId);
     if (sourceIndex < 0) return;
-
     const source = rundown.items[sourceIndex];
     const duplicate: RundownItem = {
       ...cloneItem(source),
@@ -139,7 +136,6 @@ export function RundownEditor({ initialRundown }: RundownEditorProps) {
         id: makeId(),
       })),
     };
-
     const nextItems = rundown.items.map((item) => cloneItem(item));
     nextItems.splice(sourceIndex + 1, 0, duplicate);
     applyItems(nextItems);
@@ -149,10 +145,8 @@ export function RundownEditor({ initialRundown }: RundownEditorProps) {
   function moveRow(itemId: string, direction: -1 | 1) {
     const index = rundown.items.findIndex((item) => item.id === itemId);
     if (index < 0) return;
-
     const target = index + direction;
     if (target < 0 || target >= rundown.items.length) return;
-
     const nextItems = rundown.items.map((item) => cloneItem(item));
     const [moved] = nextItems.splice(index, 1);
     nextItems.splice(target, 0, moved);
@@ -164,7 +158,6 @@ export function RundownEditor({ initialRundown }: RundownEditorProps) {
       window.alert("Minimal harus ada 1 baris rundown.");
       return;
     }
-
     const nextItems = rundown.items
       .filter((item) => item.id !== itemId)
       .map((item) => cloneItem(item));
@@ -207,11 +200,141 @@ export function RundownEditor({ initialRundown }: RundownEditorProps) {
     }));
   }
 
+  // ─── Shared row status logic ──────────────────────────────────
+  function getRowStatus(item: RundownItem) {
+    const hasError = item.durationMinutes <= 0 || item.start.trim() === "";
+    const hasOverlap = overlapIds.has(item.id);
+    const hasChain = chainMismatchIds.has(item.id);
+    return { hasError, hasOverlap, hasChain };
+  }
+
+  function getBorderClass(item: RundownItem) {
+    const { hasError, hasOverlap, hasChain } = getRowStatus(item);
+    if (hasError) return "border-l-4 border-l-rose-400";
+    if (hasOverlap) return "border-l-4 border-l-amber-400";
+    if (hasChain) return "border-l-4 border-l-sky-400";
+    return "border-l-4 border-l-transparent";
+  }
+
+  // ─── Duration input handlers (shared) ─────────────────────────
+  function handleDurationChange(itemId: string, rawValue: string) {
+    const val = parseInt(rawValue, 10);
+    if (!isNaN(val) && val >= 1) {
+      updateItemAndSync(itemId, (cur) => ({ ...cur, durationMinutes: val }));
+    }
+  }
+
+  function handleDurationBlur(
+    itemId: string,
+    e: React.FocusEvent<HTMLInputElement>,
+    currentDuration: number
+  ) {
+    const val = Math.max(1, parseInt(e.target.value, 10) || 1);
+    e.target.value = String(val);
+    if (val !== currentDuration) {
+      updateItemAndSync(itemId, (cur) => ({ ...cur, durationMinutes: val }));
+    }
+  }
+
+  // ─── Shared action buttons renderer ───────────────────────────
+  function ActionButtons({
+    itemId,
+    index,
+  }: {
+    itemId: string;
+    index: number;
+  }) {
+    return (
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          title="Duplikat"
+          onClick={(e) => {
+            e.stopPropagation();
+            duplicateRow(itemId);
+          }}
+          className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 active:scale-95"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4">
+            <rect x="9" y="9" width="13" height="13" rx="2" />
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          title="Naik"
+          onClick={(e) => {
+            e.stopPropagation();
+            moveRow(itemId, -1);
+          }}
+          disabled={index === 0}
+          className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-30 active:scale-95"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4 w-4">
+            <path d="M18 15l-6-6-6 6" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          title="Turun"
+          onClick={(e) => {
+            e.stopPropagation();
+            moveRow(itemId, 1);
+          }}
+          disabled={index === rundown.items.length - 1}
+          className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-30 active:scale-95"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4 w-4">
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          title="Hapus"
+          onClick={(e) => {
+            e.stopPropagation();
+            deleteRow(itemId);
+          }}
+          className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-50 text-rose-500 hover:bg-rose-100 active:scale-95"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4 w-4">
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+    );
+  }
+
+  // ─── Status badges renderer ─────────────────────────────────
+  function StatusBadges({ item }: { item: RundownItem }) {
+    const { hasError, hasOverlap, hasChain } = getRowStatus(item);
+    if (!hasError && !hasOverlap && !hasChain) return null;
+    return (
+      <div className="flex flex-wrap gap-1">
+        {hasError && (
+          <span className="rounded bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700">
+            Tidak valid
+          </span>
+        )}
+        {hasOverlap && (
+          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
+            Overlap
+          </span>
+        )}
+        {hasChain && (
+          <span className="rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-800">
+            Belum sinkron
+          </span>
+        )}
+      </div>
+    );
+  }
+
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-[1500px] flex-col gap-5 px-4 py-6 md:px-8">
-      {/* Header */}
-      <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-card md:p-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+      {/* ── Header ─────────────────────────────────────── */}
+      <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-card md:p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <Link
               href="/"
@@ -224,19 +347,19 @@ export function RundownEditor({ initialRundown }: RundownEditorProps) {
             </p>
           </div>
           <div className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-            Auto-save: {saveState === "saved" ? "tersimpan" : "siap"}
+            {saveState === "saved" ? "✓ Tersimpan" : "Siap"}
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-end gap-3">
-          <label className="grid min-w-[260px] flex-1 gap-1">
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+          <label className="grid flex-1 gap-1">
             <span className="text-xs font-semibold uppercase tracking-wide text-slate-600">
               Judul Acara
             </span>
             <input
               value={rundown.title}
               onChange={(event) => updateTitle(event.target.value)}
-              className="rounded-xl border border-slate-300 px-3 py-2.5 text-sm text-slate-900 outline-none ring-coral transition focus:border-coral focus:ring-2"
+              className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm text-slate-900 outline-none ring-coral transition focus:border-coral focus:ring-2"
             />
           </label>
 
@@ -244,162 +367,52 @@ export function RundownEditor({ initialRundown }: RundownEditorProps) {
             <button
               type="button"
               onClick={addRow}
-              className="rounded-xl bg-ink px-3 py-2 text-sm font-semibold text-white transition hover:brightness-110"
+              className="flex-1 rounded-xl bg-ink px-3 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 sm:flex-none"
             >
-              Tambah Baris
+              + Baris
             </button>
             <button
               type="button"
               onClick={syncTimes}
-              className="rounded-xl bg-tide px-3 py-2 text-sm font-semibold text-white transition hover:brightness-110"
+              className="flex-1 rounded-xl bg-tide px-3 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 sm:flex-none"
             >
-              Sinkron Waktu
+              Sinkron
             </button>
             <button
               type="button"
               onClick={() => exportRundownToPdf(rundown)}
-              className="rounded-xl bg-coral px-3 py-2 text-sm font-semibold text-white transition hover:brightness-110"
+              className="flex-1 rounded-xl bg-coral px-3 py-2.5 text-sm font-semibold text-white transition hover:brightness-110 sm:flex-none"
             >
-              Export PDF (A4 Portrait)
+              <span className="hidden sm:inline">Export PDF (A4 Portrait)</span>
+              <span className="sm:hidden">PDF</span>
             </button>
           </div>
         </div>
       </section>
 
-      {/* Editor + Sidebar */}
+      {/* ── Editor + Sidebar ────────────────────────────── */}
       <section className="grid gap-5 xl:grid-cols-[1fr_340px]">
-        {/* Table — no horizontal scroll */}
-        <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-card">
-          <table className="w-full border-collapse text-left text-sm">
-            <thead>
-              <tr className="bg-slate-50 text-slate-700">
-                <th className="border-b border-slate-200 px-3 py-3 font-semibold">
-                  Tanggal
-                </th>
-                <th className="border-b border-slate-200 px-3 py-3 font-semibold">
-                  Mulai
-                </th>
-                <th className="border-b border-slate-200 px-3 py-3 font-semibold">
-                  Durasi
-                </th>
-                <th className="border-b border-slate-200 px-3 py-3 font-semibold">
-                  Selesai
-                </th>
-                <th className="w-full border-b border-slate-200 px-3 py-3 font-semibold">
-                  Agenda
-                </th>
-                <th className="border-b border-slate-200 px-3 py-3 font-semibold">
-                  PIC
-                </th>
-                <th className="border-b border-slate-200 px-3 py-3 font-semibold">
-                  Lokasi
-                </th>
-                <th className="border-b border-slate-200 px-3 py-3 font-semibold">
-                  Aksi
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {rundown.items.map((item, index) => {
-                const isSelected = item.id === selectedItemId;
-                const end = calculateEndTime(item.start, item.durationMinutes);
-                const hasError =
-                  item.durationMinutes <= 0 || item.start.trim() === "";
-                const hasOverlap = overlapIds.has(item.id);
-                const hasChain = chainMismatchIds.has(item.id);
+        <div className="flex flex-col gap-5">
 
-                const rowBorder = hasError
-                  ? "border-l-4 border-l-rose-400"
-                  : hasOverlap
-                    ? "border-l-4 border-l-amber-400"
-                    : hasChain
-                      ? "border-l-4 border-l-sky-400"
-                      : "border-l-4 border-l-transparent";
+          {/* ════ MOBILE: Card View (md:hidden) ════════════ */}
+          <div className="md:hidden flex flex-col gap-3">
+            {rundown.items.map((item, index) => {
+              const isSelected = item.id === selectedItemId;
+              const end = calculateEndTime(item.start, item.durationMinutes);
+              const borderClass = getBorderClass(item);
 
-                return (
-                  <tr
-                    key={item.id}
-                    className={`align-middle transition ${rowBorder} ${isSelected
-                        ? "bg-amber-50/70"
-                        : "odd:bg-white even:bg-slate-50/35"
-                      }`}
-                    onClick={() => setSelectedItemId(item.id)}
-                  >
-                    {/* Tanggal */}
-                    <td className="border-b border-slate-100 px-3 py-2">
-                      <input
-                        type="date"
-                        value={item.date}
-                        onChange={(e) =>
-                          updateItem(item.id, (cur) => ({
-                            ...cur,
-                            date: e.target.value,
-                          }))
-                        }
-                        className="w-[120px] rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
-                      />
-                    </td>
-
-                    {/* Mulai */}
-                    <td className="border-b border-slate-100 px-3 py-2">
-                      <input
-                        type="time"
-                        value={item.start}
-                        onChange={(e) =>
-                          updateItemAndSync(item.id, (cur) => ({
-                            ...cur,
-                            start: e.target.value,
-                          }))
-                        }
-                        className="w-[100px] rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
-                      />
-                    </td>
-
-                    {/* Durasi */}
-                    <td className="border-b border-slate-100 px-3 py-2">
-                      <div className="flex items-center gap-1">
-                        <input
-                          type="number"
-                          min={1}
-                          value={item.durationMinutes}
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value, 10);
-                            if (!isNaN(val) && val >= 1) {
-                              updateItemAndSync(item.id, (cur) => ({
-                                ...cur,
-                                durationMinutes: val,
-                              }));
-                            }
-                          }}
-                          onBlur={(e) => {
-                            const val = Math.max(
-                              1,
-                              parseInt(e.target.value, 10) || 1
-                            );
-                            // Normalize display (strip leading zeros etc.)
-                            e.target.value = String(val);
-                            if (val !== item.durationMinutes) {
-                              updateItemAndSync(item.id, (cur) => ({
-                                ...cur,
-                                durationMinutes: val,
-                              }));
-                            }
-                          }}
-                          className="w-[64px] rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
-                        />
-                        <span className="text-xs text-slate-500">min</span>
-                      </div>
-                    </td>
-
-                    {/* Selesai */}
-                    <td className="border-b border-slate-100 px-3 py-2">
-                      <div className="rounded-lg bg-slate-100 px-2 py-1.5 text-xs font-semibold text-slate-700 whitespace-nowrap">
-                        {end || "--:--"}
-                      </div>
-                    </td>
-
-                    {/* Agenda */}
-                    <td className="w-full border-b border-slate-100 px-3 py-2">
+              return (
+                <div
+                  key={item.id}
+                  className={`rounded-2xl border bg-white shadow-sm transition ${borderClass} ${isSelected
+                      ? "border-amber-300 bg-amber-50/60 ring-2 ring-amber-200"
+                      : "border-slate-200"
+                    }`}
+                  onClick={() => setSelectedItemId(item.id)}
+                >
+                  {/* Card Header */}
+                  <div className="px-4 pt-4">
+                    <div className="flex items-start justify-between gap-2">
                       <input
                         value={item.agenda}
                         onChange={(e) =>
@@ -408,123 +421,242 @@ export function RundownEditor({ initialRundown }: RundownEditorProps) {
                             agenda: e.target.value,
                           }))
                         }
-                        className="w-full min-w-[140px] rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
+                        onClick={(e) => e.stopPropagation()}
+                        placeholder="Nama agenda..."
+                        className="min-w-0 flex-1 rounded-lg border border-slate-300 px-2 py-1.5 text-sm font-semibold text-slate-900 outline-none ring-coral focus:border-coral focus:ring-2"
                       />
-                    </td>
+                      <span className="mt-1 shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
+                        #{index + 1}
+                      </span>
+                    </div>
+                    <StatusBadges item={item} />
+                  </div>
 
-                    {/* PIC */}
-                    <td className="border-b border-slate-100 px-3 py-2">
+                  {/* Card Body */}
+                  <div className="mt-3 grid grid-cols-2 gap-3 px-4">
+                    <label className="grid gap-1" onClick={(e) => e.stopPropagation()}>
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Tanggal</span>
+                      <input
+                        type="date"
+                        value={item.date}
+                        onChange={(e) =>
+                          updateItem(item.id, (cur) => ({ ...cur, date: e.target.value }))
+                        }
+                        className="rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
+                      />
+                    </label>
+                    <label className="grid gap-1" onClick={(e) => e.stopPropagation()}>
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Jam Mulai</span>
+                      <input
+                        type="time"
+                        value={item.start}
+                        onChange={(e) =>
+                          updateItemAndSync(item.id, (cur) => ({ ...cur, start: e.target.value }))
+                        }
+                        className="rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
+                      />
+                    </label>
+                    <label className="grid gap-1" onClick={(e) => e.stopPropagation()}>
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Durasi</span>
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          min={1}
+                          value={item.durationMinutes}
+                          onChange={(e) => handleDurationChange(item.id, e.target.value)}
+                          onBlur={(e) => handleDurationBlur(item.id, e, item.durationMinutes)}
+                          className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
+                        />
+                        <span className="shrink-0 text-xs text-slate-500">min</span>
+                      </div>
+                    </label>
+                    <div className="grid gap-1">
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Selesai</span>
+                      <div className="flex items-center rounded-lg bg-slate-100 px-2 py-1.5 text-xs font-semibold text-slate-700">
+                        {end || "--:--"}
+                      </div>
+                    </div>
+                    <label className="grid gap-1" onClick={(e) => e.stopPropagation()}>
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">PIC</span>
                       <input
                         value={item.pic}
                         onChange={(e) =>
-                          updateItem(item.id, (cur) => ({
-                            ...cur,
-                            pic: e.target.value,
-                          }))
+                          updateItem(item.id, (cur) => ({ ...cur, pic: e.target.value }))
                         }
-                        className="w-[110px] rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
+                        className="rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
+                        placeholder="Penanggung jawab"
                       />
-                    </td>
-
-                    {/* Lokasi */}
-                    <td className="border-b border-slate-100 px-3 py-2">
+                    </label>
+                    <label className="grid gap-1" onClick={(e) => e.stopPropagation()}>
+                      <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Lokasi</span>
                       <input
                         value={item.location}
                         onChange={(e) =>
-                          updateItem(item.id, (cur) => ({
-                            ...cur,
-                            location: e.target.value,
-                          }))
+                          updateItem(item.id, (cur) => ({ ...cur, location: e.target.value }))
                         }
-                        className="w-[100px] rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
+                        className="rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
+                        placeholder="Ruangan / tempat"
                       />
-                    </td>
+                    </label>
+                  </div>
 
-                    {/* Aksi — icon buttons */}
-                    <td className="border-b border-slate-100 px-3 py-2">
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          title="Duplikat"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            duplicateRow(item.id);
-                          }}
-                          className="flex h-7 w-7 items-center justify-center rounded-md bg-slate-100 text-slate-600 hover:bg-slate-200"
-                        >
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
-                            <rect x="9" y="9" width="13" height="13" rx="2" />
-                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                          </svg>
-                        </button>
-                        <button
-                          type="button"
-                          title="Naik"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            moveRow(item.id, -1);
-                          }}
-                          disabled={index === 0}
-                          className="flex h-7 w-7 items-center justify-center rounded-md bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-30"
-                        >
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-3.5 w-3.5">
-                            <path d="M18 15l-6-6-6 6" />
-                          </svg>
-                        </button>
-                        <button
-                          type="button"
-                          title="Turun"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            moveRow(item.id, 1);
-                          }}
-                          disabled={index === rundown.items.length - 1}
-                          className="flex h-7 w-7 items-center justify-center rounded-md bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-30"
-                        >
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-3.5 w-3.5">
-                            <path d="M6 9l6 6 6-6" />
-                          </svg>
-                        </button>
-                        <button
-                          type="button"
-                          title="Hapus"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            deleteRow(item.id);
-                          }}
-                          className="flex h-7 w-7 items-center justify-center rounded-md bg-rose-50 text-rose-500 hover:bg-rose-100"
-                        >
-                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-3.5 w-3.5">
-                            <path d="M18 6L6 18M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                  {/* Card Footer */}
+                  <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3 mt-3">
+                    <ActionButtons itemId={item.id} index={index} />
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedItemId(item.id);
+                        // Scroll sidebar into view
+                        document.getElementById("sidebar")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                      }}
+                      className="rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-200"
+                    >
+                      Catatan & Field →
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
 
-          {/* Legend */}
-          <div className="flex flex-wrap gap-3 border-t border-slate-100 px-4 py-3 text-[10px] font-semibold text-slate-500">
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block h-3 w-1 rounded-full bg-rose-400" />
-              Durasi / waktu tidak valid
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block h-3 w-1 rounded-full bg-amber-400" />
-              Overlap
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block h-3 w-1 rounded-full bg-sky-400" />
-              Belum sinkron
-            </span>
+            {/* Add row button */}
+            <button
+              type="button"
+              onClick={addRow}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-300 py-4 text-sm font-semibold text-slate-500 hover:border-ink hover:text-ink transition"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4 w-4">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              Tambah Baris
+            </button>
+          </div>
+
+          {/* ════ DESKTOP: Table View (hidden md:block) ════ */}
+          <div className="hidden md:block overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-card">
+            <table className="w-full border-collapse text-left text-sm">
+              <thead>
+                <tr className="bg-slate-50 text-slate-700">
+                  <th className="border-b border-slate-200 px-3 py-3 font-semibold">Tanggal</th>
+                  <th className="border-b border-slate-200 px-3 py-3 font-semibold">Mulai</th>
+                  <th className="border-b border-slate-200 px-3 py-3 font-semibold">Durasi</th>
+                  <th className="border-b border-slate-200 px-3 py-3 font-semibold">Selesai</th>
+                  <th className="w-full border-b border-slate-200 px-3 py-3 font-semibold">Agenda</th>
+                  <th className="border-b border-slate-200 px-3 py-3 font-semibold">PIC</th>
+                  <th className="border-b border-slate-200 px-3 py-3 font-semibold">Lokasi</th>
+                  <th className="border-b border-slate-200 px-3 py-3 font-semibold">Aksi</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rundown.items.map((item, index) => {
+                  const isSelected = item.id === selectedItemId;
+                  const end = calculateEndTime(item.start, item.durationMinutes);
+                  const borderClass = getBorderClass(item);
+
+                  return (
+                    <tr
+                      key={item.id}
+                      className={`align-middle transition ${borderClass} ${isSelected
+                          ? "bg-amber-50/70"
+                          : "odd:bg-white even:bg-slate-50/35"
+                        }`}
+                      onClick={() => setSelectedItemId(item.id)}
+                    >
+                      <td className="border-b border-slate-100 px-3 py-2">
+                        <input
+                          type="date"
+                          value={item.date}
+                          onChange={(e) =>
+                            updateItem(item.id, (cur) => ({ ...cur, date: e.target.value }))
+                          }
+                          className="w-[120px] rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
+                        />
+                      </td>
+                      <td className="border-b border-slate-100 px-3 py-2">
+                        <input
+                          type="time"
+                          value={item.start}
+                          onChange={(e) =>
+                            updateItemAndSync(item.id, (cur) => ({ ...cur, start: e.target.value }))
+                          }
+                          className="w-[100px] rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
+                        />
+                      </td>
+                      <td className="border-b border-slate-100 px-3 py-2">
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number"
+                            min={1}
+                            value={item.durationMinutes}
+                            onChange={(e) => handleDurationChange(item.id, e.target.value)}
+                            onBlur={(e) => handleDurationBlur(item.id, e, item.durationMinutes)}
+                            className="w-[64px] rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
+                          />
+                          <span className="text-xs text-slate-500">min</span>
+                        </div>
+                      </td>
+                      <td className="border-b border-slate-100 px-3 py-2">
+                        <div className="whitespace-nowrap rounded-lg bg-slate-100 px-2 py-1.5 text-xs font-semibold text-slate-700">
+                          {end || "--:--"}
+                        </div>
+                      </td>
+                      <td className="w-full border-b border-slate-100 px-3 py-2">
+                        <input
+                          value={item.agenda}
+                          onChange={(e) =>
+                            updateItem(item.id, (cur) => ({ ...cur, agenda: e.target.value }))
+                          }
+                          className="w-full min-w-[140px] rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
+                        />
+                      </td>
+                      <td className="border-b border-slate-100 px-3 py-2">
+                        <input
+                          value={item.pic}
+                          onChange={(e) =>
+                            updateItem(item.id, (cur) => ({ ...cur, pic: e.target.value }))
+                          }
+                          className="w-[110px] rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
+                        />
+                      </td>
+                      <td className="border-b border-slate-100 px-3 py-2">
+                        <input
+                          value={item.location}
+                          onChange={(e) =>
+                            updateItem(item.id, (cur) => ({ ...cur, location: e.target.value }))
+                          }
+                          className="w-[100px] rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
+                        />
+                      </td>
+                      <td className="border-b border-slate-100 px-3 py-2">
+                        <ActionButtons itemId={item.id} index={index} />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            {/* Legend */}
+            <div className="flex flex-wrap gap-3 border-t border-slate-100 px-4 py-3 text-[10px] font-semibold text-slate-500">
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-3 w-1 rounded-full bg-rose-400" />
+                Tidak valid
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-3 w-1 rounded-full bg-amber-400" />
+                Overlap
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-3 w-1 rounded-full bg-sky-400" />
+                Belum sinkron
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Sidebar */}
-        <aside className="rounded-3xl border border-slate-200 bg-white shadow-card">
+        {/* ── Sidebar ─────────────────────────────────────── */}
+        <aside id="sidebar" className="rounded-3xl border border-slate-200 bg-white shadow-card">
           {/* Tab bar */}
           <div className="flex border-b border-slate-200">
             <button
@@ -572,33 +704,13 @@ export function RundownEditor({ initialRundown }: RundownEditorProps) {
                     </span>
                   </p>
 
-                  {/* Status badge */}
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {selectedItem.durationMinutes <= 0 && (
-                      <span className="rounded bg-rose-100 px-2 py-1 text-[10px] font-semibold text-rose-700">
-                        Durasi tidak valid
-                      </span>
-                    )}
-                    {selectedItem.start.trim() === "" && (
-                      <span className="rounded bg-rose-100 px-2 py-1 text-[10px] font-semibold text-rose-700">
-                        Jam mulai kosong
-                      </span>
-                    )}
-                    {overlapIds.has(selectedItem.id) && (
-                      <span className="rounded bg-amber-100 px-2 py-1 text-[10px] font-semibold text-amber-800">
-                        Overlap
-                      </span>
-                    )}
-                    {chainMismatchIds.has(selectedItem.id) && (
-                      <span className="rounded bg-sky-100 px-2 py-1 text-[10px] font-semibold text-sky-800">
-                        Belum sinkron
-                      </span>
-                    )}
-                    {selectedItem.durationMinutes > 0 &&
-                      selectedItem.start.trim() !== "" &&
-                      !overlapIds.has(selectedItem.id) &&
-                      !chainMismatchIds.has(selectedItem.id) && (
-                        <span className="rounded bg-emerald-100 px-2 py-1 text-[10px] font-semibold text-emerald-800">
+                  {/* Status badges */}
+                  <div className="mt-2">
+                    <StatusBadges item={selectedItem} />
+                    {!getRowStatus(selectedItem).hasError &&
+                      !getRowStatus(selectedItem).hasOverlap &&
+                      !getRowStatus(selectedItem).hasChain && (
+                        <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800">
                           OK
                         </span>
                       )}
@@ -619,7 +731,7 @@ export function RundownEditor({ initialRundown }: RundownEditorProps) {
                           }))
                         }
                         rows={3}
-                        className="rounded-lg border border-slate-300 px-2 py-1.5 text-xs resize-y"
+                        className="resize-y rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
                         placeholder="Catatan tambahan untuk item ini..."
                       />
                     </label>
@@ -628,46 +740,27 @@ export function RundownEditor({ initialRundown }: RundownEditorProps) {
                   <hr className="my-4 border-slate-200" />
 
                   {/* Custom Fields */}
-                  <h2 className="text-sm font-semibold text-ink">
-                    Custom Field
-                  </h2>
+                  <h2 className="text-sm font-semibold text-ink">Custom Field</h2>
                   <div className="mt-3 grid gap-3">
                     {selectedItem.customFields.length === 0 && (
-                      <p className="text-xs text-slate-500">
-                        Belum ada field tambahan.
-                      </p>
+                      <p className="text-xs text-slate-500">Belum ada field tambahan.</p>
                     )}
                     {selectedItem.customFields.map((field) => (
-                      <div
-                        key={field.id}
-                        className="rounded-2xl border border-slate-200 p-3"
-                      >
+                      <div key={field.id} className="rounded-2xl border border-slate-200 p-3">
                         <label className="grid gap-1">
-                          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Label
-                          </span>
+                          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Label</span>
                           <input
                             value={field.key}
-                            onChange={(e) =>
-                              updateCustomField(field.id, {
-                                key: e.target.value,
-                              })
-                            }
+                            onChange={(e) => updateCustomField(field.id, { key: e.target.value })}
                             className="rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
                             placeholder="Contoh: Kebutuhan alat"
                           />
                         </label>
                         <label className="mt-2 grid gap-1">
-                          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                            Text
-                          </span>
+                          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Text</span>
                           <textarea
                             value={field.value}
-                            onChange={(e) =>
-                              updateCustomField(field.id, {
-                                value: e.target.value,
-                              })
-                            }
+                            onChange={(e) => updateCustomField(field.id, { value: e.target.value })}
                             rows={2}
                             className="rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
                             placeholder="Isi detail tambahan"
@@ -704,8 +797,7 @@ export function RundownEditor({ initialRundown }: RundownEditorProps) {
                   <path d="M12 16v-4M12 8h.01" />
                 </svg>
                 <span>
-                  Draft AI akan <strong>menggantikan</strong> semua item yang
-                  ada. Simpan dulu jika perlu.
+                  Draft AI akan <strong>menggantikan</strong> semua item yang ada. Simpan dulu jika perlu.
                 </span>
               </div>
               <AiPromptPanel
