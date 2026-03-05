@@ -35,6 +35,8 @@ export function RundownEditor({ initialRundown }: RundownEditorProps) {
   );
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("custom-fields");
+  // Draft string per item saat user mengedit durasi (agar bisa dikosongkan)
+  const [durationDrafts, setDurationDrafts] = useState<Record<string, string>>({});
 
   const overlapIds = useMemo(
     () => findOverlapItemIds(rundown.items),
@@ -216,24 +218,31 @@ export function RundownEditor({ initialRundown }: RundownEditorProps) {
     return "border-l-4 border-l-transparent";
   }
 
-  // ─── Duration input handlers (shared) ─────────────────────────
-  function handleDurationChange(itemId: string, rawValue: string) {
-    const val = parseInt(rawValue, 10);
-    if (!isNaN(val) && val >= 1) {
-      updateItemAndSync(itemId, (cur) => ({ ...cur, durationMinutes: val }));
-    }
-  }
-
-  function handleDurationBlur(
-    itemId: string,
-    e: React.FocusEvent<HTMLInputElement>,
-    currentDuration: number
-  ) {
-    const val = Math.max(1, parseInt(e.target.value, 10) || 1);
-    e.target.value = String(val);
-    if (val !== currentDuration) {
-      updateItemAndSync(itemId, (cur) => ({ ...cur, durationMinutes: val }));
-    }
+  // ─── Duration input: draft-based agar bisa dikosongkan & diedit bebas ──
+  function durationInputProps(item: RundownItem) {
+    const draft = durationDrafts[item.id];
+    return {
+      type: "text" as const,
+      inputMode: "numeric" as const,
+      pattern: "[0-9]*",
+      value: draft ?? String(item.durationMinutes),
+      onFocus: (e: React.FocusEvent<HTMLInputElement>) => {
+        setDurationDrafts((prev) => ({ ...prev, [item.id]: String(item.durationMinutes) }));
+        e.target.select();
+      },
+      onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+        setDurationDrafts((prev) => ({ ...prev, [item.id]: e.target.value }));
+      },
+      onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
+        const val = Math.max(1, parseInt(e.target.value, 10) || 1);
+        setDurationDrafts((prev) => {
+          const next = { ...prev };
+          delete next[item.id];
+          return next;
+        });
+        updateItemAndSync(item.id, (cur) => ({ ...cur, durationMinutes: val }));
+      },
+    };
   }
 
   // ─── Shared action buttons renderer ───────────────────────────
@@ -405,8 +414,8 @@ export function RundownEditor({ initialRundown }: RundownEditorProps) {
                 <div
                   key={item.id}
                   className={`rounded-2xl border bg-white shadow-sm transition ${borderClass} ${isSelected
-                      ? "border-amber-300 bg-amber-50/60 ring-2 ring-amber-200"
-                      : "border-slate-200"
+                    ? "border-amber-300 bg-amber-50/60 ring-2 ring-amber-200"
+                    : "border-slate-200"
                     }`}
                   onClick={() => setSelectedItemId(item.id)}
                 >
@@ -460,11 +469,7 @@ export function RundownEditor({ initialRundown }: RundownEditorProps) {
                       <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Durasi</span>
                       <div className="flex items-center gap-1">
                         <input
-                          type="number"
-                          min={1}
-                          value={item.durationMinutes}
-                          onChange={(e) => handleDurationChange(item.id, e.target.value)}
-                          onBlur={(e) => handleDurationBlur(item.id, e, item.durationMinutes)}
+                          {...durationInputProps(item)}
                           className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
                         />
                         <span className="shrink-0 text-xs text-slate-500">min</span>
@@ -558,8 +563,8 @@ export function RundownEditor({ initialRundown }: RundownEditorProps) {
                     <tr
                       key={item.id}
                       className={`align-middle transition ${borderClass} ${isSelected
-                          ? "bg-amber-50/70"
-                          : "odd:bg-white even:bg-slate-50/35"
+                        ? "bg-amber-50/70"
+                        : "odd:bg-white even:bg-slate-50/35"
                         }`}
                       onClick={() => setSelectedItemId(item.id)}
                     >
@@ -586,11 +591,7 @@ export function RundownEditor({ initialRundown }: RundownEditorProps) {
                       <td className="border-b border-slate-100 px-3 py-2">
                         <div className="flex items-center gap-1">
                           <input
-                            type="number"
-                            min={1}
-                            value={item.durationMinutes}
-                            onChange={(e) => handleDurationChange(item.id, e.target.value)}
-                            onBlur={(e) => handleDurationBlur(item.id, e, item.durationMinutes)}
+                            {...durationInputProps(item)}
                             className="w-[64px] rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
                           />
                           <span className="text-xs text-slate-500">min</span>
@@ -663,8 +664,8 @@ export function RundownEditor({ initialRundown }: RundownEditorProps) {
               type="button"
               onClick={() => setSidebarTab("custom-fields")}
               className={`flex flex-1 items-center justify-center gap-1.5 py-3 text-xs font-semibold transition ${sidebarTab === "custom-fields"
-                  ? "border-b-2 border-ink text-ink"
-                  : "text-slate-500 hover:text-slate-800"
+                ? "border-b-2 border-ink text-ink"
+                : "text-slate-500 hover:text-slate-800"
                 }`}
             >
               <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -677,8 +678,8 @@ export function RundownEditor({ initialRundown }: RundownEditorProps) {
               type="button"
               onClick={() => setSidebarTab("ai-generate")}
               className={`flex flex-1 items-center justify-center gap-1.5 py-3 text-xs font-semibold transition ${sidebarTab === "ai-generate"
-                  ? "border-b-2 border-violet-600 text-violet-700"
-                  : "text-slate-500 hover:text-slate-800"
+                ? "border-b-2 border-violet-600 text-violet-700"
+                : "text-slate-500 hover:text-slate-800"
                 }`}
             >
               <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
