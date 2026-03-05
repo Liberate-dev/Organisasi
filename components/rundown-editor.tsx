@@ -5,7 +5,12 @@ import { useMemo, useState } from "react";
 
 import { exportRundownToPdf } from "@/lib/pdf-export";
 import { makeId, upsertRundown } from "@/lib/storage";
-import { calculateEndTime, findChainMismatchItemIds, findOverlapItemIds, syncTimesByDate } from "@/lib/time";
+import {
+  calculateEndTime,
+  findChainMismatchItemIds,
+  findOverlapItemIds,
+  syncTimesByDate,
+} from "@/lib/time";
 import { CustomField, Rundown, RundownItem } from "@/lib/types";
 import { AiPromptPanel } from "@/components/ai-prompt-panel";
 
@@ -25,14 +30,23 @@ type RundownEditorProps = {
 
 export function RundownEditor({ initialRundown }: RundownEditorProps) {
   const [rundown, setRundown] = useState<Rundown>(initialRundown);
-  const [selectedItemId, setSelectedItemId] = useState<string>(initialRundown.items[0]?.id ?? "");
+  const [selectedItemId, setSelectedItemId] = useState<string>(
+    initialRundown.items[0]?.id ?? ""
+  );
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("custom-fields");
 
-  const overlapIds = useMemo(() => findOverlapItemIds(rundown.items), [rundown.items]);
-  const chainMismatchIds = useMemo(() => findChainMismatchItemIds(rundown.items), [rundown.items]);
+  const overlapIds = useMemo(
+    () => findOverlapItemIds(rundown.items),
+    [rundown.items]
+  );
+  const chainMismatchIds = useMemo(
+    () => findChainMismatchItemIds(rundown.items),
+    [rundown.items]
+  );
 
-  const selectedItem = rundown.items.find((item) => item.id === selectedItemId) ?? null;
+  const selectedItem =
+    rundown.items.find((item) => item.id === selectedItemId) ?? null;
 
   function applyItems(nextItems: RundownItem[]) {
     const next: Rundown = {
@@ -56,22 +70,42 @@ export function RundownEditor({ initialRundown }: RundownEditorProps) {
     setSaveState("saved");
   }
 
-  function updateItem(itemId: string, updater: (item: RundownItem) => RundownItem) {
-    const nextItems = rundown.items.map((item) => (item.id === itemId ? updater(cloneItem(item)) : cloneItem(item)));
+  /** Update sebuah item tanpa sync rantai (untuk kolom non-waktu) */
+  function updateItem(
+    itemId: string,
+    updater: (item: RundownItem) => RundownItem
+  ) {
+    const nextItems = rundown.items.map((item) =>
+      item.id === itemId ? updater(cloneItem(item)) : cloneItem(item)
+    );
     applyItems(nextItems);
+  }
+
+  /** Update item lalu otomatis sinkron rantai waktu (untuk kolom durasi & mulai) */
+  function updateItemAndSync(
+    itemId: string,
+    updater: (item: RundownItem) => RundownItem
+  ) {
+    const nextItems = rundown.items.map((item) =>
+      item.id === itemId ? updater(cloneItem(item)) : cloneItem(item)
+    );
+    applyItems(syncTimesByDate(nextItems));
   }
 
   function addRow() {
     const anchorIndex = selectedItemId
       ? rundown.items.findIndex((item) => item.id === selectedItemId)
       : rundown.items.length - 1;
-    const insertIndex = anchorIndex >= 0 ? anchorIndex + 1 : rundown.items.length;
+    const insertIndex =
+      anchorIndex >= 0 ? anchorIndex + 1 : rundown.items.length;
     const anchor = rundown.items[insertIndex - 1];
 
     const date = anchor?.date ?? new Date().toISOString().slice(0, 10);
     const start =
       anchor && anchor.date === date
-        ? calculateEndTime(anchor.start, anchor.durationMinutes) || anchor.start || "08:00"
+        ? calculateEndTime(anchor.start, anchor.durationMinutes) ||
+        anchor.start ||
+        "08:00"
         : "08:00";
 
     const newItem: RundownItem = {
@@ -131,7 +165,9 @@ export function RundownEditor({ initialRundown }: RundownEditorProps) {
       return;
     }
 
-    const nextItems = rundown.items.filter((item) => item.id !== itemId).map((item) => cloneItem(item));
+    const nextItems = rundown.items
+      .filter((item) => item.id !== itemId)
+      .map((item) => cloneItem(item));
     applyItems(nextItems);
     if (selectedItemId === itemId) {
       setSelectedItemId(nextItems[0]?.id ?? "");
@@ -147,12 +183,7 @@ export function RundownEditor({ initialRundown }: RundownEditorProps) {
     updateItem(selectedItem.id, (item) => ({
       ...item,
       customFields: item.customFields.map((field) =>
-        field.id === fieldId
-          ? {
-            ...field,
-            ...patch,
-          }
-          : field,
+        field.id === fieldId ? { ...field, ...patch } : field
       ),
     }));
   }
@@ -163,11 +194,7 @@ export function RundownEditor({ initialRundown }: RundownEditorProps) {
       ...item,
       customFields: [
         ...item.customFields,
-        {
-          id: makeId(),
-          key: "",
-          value: "",
-        },
+        { id: makeId(), key: "", value: "" },
       ],
     }));
   }
@@ -182,6 +209,7 @@ export function RundownEditor({ initialRundown }: RundownEditorProps) {
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-[1500px] flex-col gap-5 px-4 py-6 md:px-8">
+      {/* Header */}
       <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-card md:p-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -191,7 +219,9 @@ export function RundownEditor({ initialRundown }: RundownEditorProps) {
             >
               Kembali
             </Link>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-tide">Editor Rundown</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-tide">
+              Editor Rundown
+            </p>
           </div>
           <div className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
             Auto-save: {saveState === "saved" ? "tersimpan" : "siap"}
@@ -200,7 +230,9 @@ export function RundownEditor({ initialRundown }: RundownEditorProps) {
 
         <div className="mt-4 flex flex-wrap items-end gap-3">
           <label className="grid min-w-[260px] flex-1 gap-1">
-            <span className="text-xs font-semibold uppercase tracking-wide text-slate-600">Judul Acara</span>
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-600">
+              Judul Acara
+            </span>
             <input
               value={rundown.title}
               onChange={(event) => updateTitle(event.target.value)}
@@ -234,219 +266,237 @@ export function RundownEditor({ initialRundown }: RundownEditorProps) {
         </div>
       </section>
 
+      {/* Editor + Sidebar */}
       <section className="grid gap-5 xl:grid-cols-[1fr_340px]">
-        <div className="overflow-x-auto rounded-3xl border border-slate-200 bg-white shadow-card">
-          <table className="min-w-[1120px] border-collapse text-left text-sm">
+        {/* Table — no horizontal scroll */}
+        <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-card">
+          <table className="w-full border-collapse text-left text-sm">
             <thead>
               <tr className="bg-slate-50 text-slate-700">
-                <th className="border-b border-slate-200 px-3 py-3 font-semibold">Tanggal</th>
-                <th className="border-b border-slate-200 px-3 py-3 font-semibold">Mulai</th>
-                <th className="border-b border-slate-200 px-3 py-3 font-semibold">Durasi</th>
-                <th className="border-b border-slate-200 px-3 py-3 font-semibold">Selesai</th>
-                <th className="border-b border-slate-200 px-3 py-3 font-semibold">Agenda</th>
-                <th className="border-b border-slate-200 px-3 py-3 font-semibold">PIC</th>
-                <th className="border-b border-slate-200 px-3 py-3 font-semibold">Lokasi</th>
-                <th className="border-b border-slate-200 px-3 py-3 font-semibold">Catatan</th>
-                <th className="border-b border-slate-200 px-3 py-3 font-semibold">Peringatan</th>
-                <th className="border-b border-slate-200 px-3 py-3 font-semibold">Aksi</th>
+                <th className="border-b border-slate-200 px-3 py-3 font-semibold">
+                  Tanggal
+                </th>
+                <th className="border-b border-slate-200 px-3 py-3 font-semibold">
+                  Mulai
+                </th>
+                <th className="border-b border-slate-200 px-3 py-3 font-semibold">
+                  Durasi
+                </th>
+                <th className="border-b border-slate-200 px-3 py-3 font-semibold">
+                  Selesai
+                </th>
+                <th className="w-full border-b border-slate-200 px-3 py-3 font-semibold">
+                  Agenda
+                </th>
+                <th className="border-b border-slate-200 px-3 py-3 font-semibold">
+                  PIC
+                </th>
+                <th className="border-b border-slate-200 px-3 py-3 font-semibold">
+                  Lokasi
+                </th>
+                <th className="border-b border-slate-200 px-3 py-3 font-semibold">
+                  Aksi
+                </th>
               </tr>
             </thead>
             <tbody>
               {rundown.items.map((item, index) => {
                 const isSelected = item.id === selectedItemId;
                 const end = calculateEndTime(item.start, item.durationMinutes);
-                const warningBadDuration = item.durationMinutes <= 0;
-                const warningMissingStart = item.start.trim() === "";
+                const hasError =
+                  item.durationMinutes <= 0 || item.start.trim() === "";
+                const hasOverlap = overlapIds.has(item.id);
+                const hasChain = chainMismatchIds.has(item.id);
+
+                const rowBorder = hasError
+                  ? "border-l-4 border-l-rose-400"
+                  : hasOverlap
+                    ? "border-l-4 border-l-amber-400"
+                    : hasChain
+                      ? "border-l-4 border-l-sky-400"
+                      : "border-l-4 border-l-transparent";
 
                 return (
                   <tr
                     key={item.id}
-                    className={`align-top transition ${isSelected ? "bg-amber-50/70" : "odd:bg-white even:bg-slate-50/35"
+                    className={`align-middle transition ${rowBorder} ${isSelected
+                        ? "bg-amber-50/70"
+                        : "odd:bg-white even:bg-slate-50/35"
                       }`}
                     onClick={() => setSelectedItemId(item.id)}
                   >
+                    {/* Tanggal */}
                     <td className="border-b border-slate-100 px-3 py-2">
                       <input
                         type="date"
                         value={item.date}
-                        onChange={(event) =>
-                          updateItem(item.id, (current) => ({
-                            ...current,
-                            date: event.target.value,
+                        onChange={(e) =>
+                          updateItem(item.id, (cur) => ({
+                            ...cur,
+                            date: e.target.value,
                           }))
                         }
-                        className="w-[145px] rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
+                        className="w-[120px] rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
                       />
                     </td>
+
+                    {/* Mulai */}
                     <td className="border-b border-slate-100 px-3 py-2">
                       <input
                         type="time"
                         value={item.start}
-                        onChange={(event) =>
-                          updateItem(item.id, (current) => ({
-                            ...current,
-                            start: event.target.value,
+                        onChange={(e) =>
+                          updateItemAndSync(item.id, (cur) => ({
+                            ...cur,
+                            start: e.target.value,
                           }))
                         }
-                        className="w-[110px] rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
+                        className="w-[100px] rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
                       />
                     </td>
+
+                    {/* Durasi */}
                     <td className="border-b border-slate-100 px-3 py-2">
                       <div className="flex items-center gap-1">
                         <input
                           type="number"
                           min={1}
                           value={item.durationMinutes}
-                          onChange={(event) =>
-                            updateItem(item.id, (current) => ({
-                              ...current,
-                              durationMinutes: Number(event.target.value),
-                            }))
-                          }
-                          className="w-[88px] rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value, 10);
+                            if (!isNaN(val) && val >= 1) {
+                              updateItemAndSync(item.id, (cur) => ({
+                                ...cur,
+                                durationMinutes: val,
+                              }));
+                            }
+                          }}
+                          onBlur={(e) => {
+                            const val = Math.max(
+                              1,
+                              parseInt(e.target.value, 10) || 1
+                            );
+                            // Normalize display (strip leading zeros etc.)
+                            e.target.value = String(val);
+                            if (val !== item.durationMinutes) {
+                              updateItemAndSync(item.id, (cur) => ({
+                                ...cur,
+                                durationMinutes: val,
+                              }));
+                            }
+                          }}
+                          className="w-[64px] rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
                         />
                         <span className="text-xs text-slate-500">min</span>
                       </div>
                     </td>
+
+                    {/* Selesai */}
                     <td className="border-b border-slate-100 px-3 py-2">
-                      <div className="rounded-lg bg-slate-100 px-2 py-1.5 text-xs font-semibold text-slate-700">
+                      <div className="rounded-lg bg-slate-100 px-2 py-1.5 text-xs font-semibold text-slate-700 whitespace-nowrap">
                         {end || "--:--"}
                       </div>
                     </td>
-                    <td className="border-b border-slate-100 px-3 py-2">
+
+                    {/* Agenda */}
+                    <td className="w-full border-b border-slate-100 px-3 py-2">
                       <input
                         value={item.agenda}
-                        onChange={(event) =>
-                          updateItem(item.id, (current) => ({
-                            ...current,
-                            agenda: event.target.value,
+                        onChange={(e) =>
+                          updateItem(item.id, (cur) => ({
+                            ...cur,
+                            agenda: e.target.value,
                           }))
                         }
-                        className="w-[220px] rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
+                        className="w-full min-w-[140px] rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
                       />
                     </td>
+
+                    {/* PIC */}
                     <td className="border-b border-slate-100 px-3 py-2">
                       <input
                         value={item.pic}
-                        onChange={(event) =>
-                          updateItem(item.id, (current) => ({
-                            ...current,
-                            pic: event.target.value,
+                        onChange={(e) =>
+                          updateItem(item.id, (cur) => ({
+                            ...cur,
+                            pic: e.target.value,
                           }))
                         }
-                        className="w-[150px] rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
+                        className="w-[110px] rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
                       />
                     </td>
+
+                    {/* Lokasi */}
                     <td className="border-b border-slate-100 px-3 py-2">
                       <input
                         value={item.location}
-                        onChange={(event) =>
-                          updateItem(item.id, (current) => ({
-                            ...current,
-                            location: event.target.value,
+                        onChange={(e) =>
+                          updateItem(item.id, (cur) => ({
+                            ...cur,
+                            location: e.target.value,
                           }))
                         }
-                        className="w-[150px] rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
+                        className="w-[100px] rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
                       />
                     </td>
+
+                    {/* Aksi — icon buttons */}
                     <td className="border-b border-slate-100 px-3 py-2">
-                      <textarea
-                        value={item.notes}
-                        onChange={(event) =>
-                          updateItem(item.id, (current) => ({
-                            ...current,
-                            notes: event.target.value,
-                          }))
-                        }
-                        rows={2}
-                        className="w-[220px] resize-y rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
-                      />
-                    </td>
-                    <td className="border-b border-slate-100 px-3 py-2">
-                      <div className="flex flex-col gap-1 text-[10px] font-semibold">
-                        {warningBadDuration && (
-                          <span className="w-fit rounded bg-rose-100 px-2 py-1 text-rose-700">
-                            Durasi tidak valid
-                          </span>
-                        )}
-                        {warningMissingStart && (
-                          <span className="w-fit rounded bg-rose-100 px-2 py-1 text-rose-700">
-                            Jam mulai kosong
-                          </span>
-                        )}
-                        {overlapIds.has(item.id) && (
-                          <span className="w-fit rounded bg-amber-100 px-2 py-1 text-amber-800">
-                            Overlap
-                          </span>
-                        )}
-                        {chainMismatchIds.has(item.id) && (
-                          <span className="w-fit rounded bg-sky-100 px-2 py-1 text-sky-800">
-                            Belum sinkron
-                          </span>
-                        )}
-                        {!warningBadDuration &&
-                          !warningMissingStart &&
-                          !overlapIds.has(item.id) &&
-                          !chainMismatchIds.has(item.id) && (
-                            <span className="w-fit rounded bg-emerald-100 px-2 py-1 text-emerald-800">
-                              OK
-                            </span>
-                          )}
-                      </div>
-                    </td>
-                    <td className="border-b border-slate-100 px-3 py-2">
-                      <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-1">
                         <button
                           type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
+                          title="Duplikat"
+                          onClick={(e) => {
+                            e.stopPropagation();
                             duplicateRow(item.id);
                           }}
-                          className="rounded-md bg-slate-200 px-2 py-1 text-[10px] font-semibold text-slate-700 hover:bg-slate-300"
+                          className="flex h-7 w-7 items-center justify-center rounded-md bg-slate-100 text-slate-600 hover:bg-slate-200"
                         >
-                          Duplikat
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
+                            <rect x="9" y="9" width="13" height="13" rx="2" />
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                          </svg>
                         </button>
                         <button
                           type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
+                          title="Naik"
+                          onClick={(e) => {
+                            e.stopPropagation();
                             moveRow(item.id, -1);
                           }}
                           disabled={index === 0}
-                          className="rounded-md bg-slate-200 px-2 py-1 text-[10px] font-semibold text-slate-700 hover:bg-slate-300 disabled:opacity-40"
+                          className="flex h-7 w-7 items-center justify-center rounded-md bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-30"
                         >
-                          Naik
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-3.5 w-3.5">
+                            <path d="M18 15l-6-6-6 6" />
+                          </svg>
                         </button>
                         <button
                           type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
+                          title="Turun"
+                          onClick={(e) => {
+                            e.stopPropagation();
                             moveRow(item.id, 1);
                           }}
                           disabled={index === rundown.items.length - 1}
-                          className="rounded-md bg-slate-200 px-2 py-1 text-[10px] font-semibold text-slate-700 hover:bg-slate-300 disabled:opacity-40"
+                          className="flex h-7 w-7 items-center justify-center rounded-md bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-30"
                         >
-                          Turun
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-3.5 w-3.5">
+                            <path d="M6 9l6 6 6-6" />
+                          </svg>
                         </button>
                         <button
                           type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
+                          title="Hapus"
+                          onClick={(e) => {
+                            e.stopPropagation();
                             deleteRow(item.id);
                           }}
-                          className="rounded-md bg-rose-100 px-2 py-1 text-[10px] font-semibold text-rose-700 hover:bg-rose-200"
+                          className="flex h-7 w-7 items-center justify-center rounded-md bg-rose-50 text-rose-500 hover:bg-rose-100"
                         >
-                          Hapus
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setSelectedItemId(item.id);
-                          }}
-                          className="rounded-md bg-amber-100 px-2 py-1 text-[10px] font-semibold text-amber-800 hover:bg-amber-200"
-                        >
-                          Field
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-3.5 w-3.5">
+                            <path d="M18 6L6 18M6 6l12 12" />
+                          </svg>
                         </button>
                       </div>
                     </td>
@@ -455,8 +505,25 @@ export function RundownEditor({ initialRundown }: RundownEditorProps) {
               })}
             </tbody>
           </table>
+
+          {/* Legend */}
+          <div className="flex flex-wrap gap-3 border-t border-slate-100 px-4 py-3 text-[10px] font-semibold text-slate-500">
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-3 w-1 rounded-full bg-rose-400" />
+              Durasi / waktu tidak valid
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-3 w-1 rounded-full bg-amber-400" />
+              Overlap
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block h-3 w-1 rounded-full bg-sky-400" />
+              Belum sinkron
+            </span>
+          </div>
         </div>
 
+        {/* Sidebar */}
         <aside className="rounded-3xl border border-slate-200 bg-white shadow-card">
           {/* Tab bar */}
           <div className="flex border-b border-slate-200">
@@ -472,7 +539,7 @@ export function RundownEditor({ initialRundown }: RundownEditorProps) {
                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
               </svg>
-              Custom Field
+              Detail & Field
             </button>
             <button
               type="button"
@@ -489,37 +556,118 @@ export function RundownEditor({ initialRundown }: RundownEditorProps) {
             </button>
           </div>
 
-          {/* Tab: Custom Fields */}
+          {/* Tab: Detail & Custom Fields */}
           {sidebarTab === "custom-fields" && (
             <div className="p-5">
-              <h2 className="text-lg font-semibold text-ink">Custom Field (Text Only)</h2>
               {!selectedItem ? (
-                <p className="mt-3 text-sm text-slate-600">Pilih satu baris untuk mengatur custom field.</p>
+                <p className="mt-3 text-sm text-slate-600">
+                  Pilih satu baris untuk melihat detail.
+                </p>
               ) : (
                 <>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Item terpilih: <span className="font-semibold text-slate-700">{selectedItem.agenda || "(Tanpa agenda)"}</span>
+                  <p className="text-xs text-slate-500">
+                    Item terpilih:{" "}
+                    <span className="font-semibold text-slate-700">
+                      {selectedItem.agenda || "(Tanpa agenda)"}
+                    </span>
                   </p>
-                  <div className="mt-4 grid gap-3">
+
+                  {/* Status badge */}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {selectedItem.durationMinutes <= 0 && (
+                      <span className="rounded bg-rose-100 px-2 py-1 text-[10px] font-semibold text-rose-700">
+                        Durasi tidak valid
+                      </span>
+                    )}
+                    {selectedItem.start.trim() === "" && (
+                      <span className="rounded bg-rose-100 px-2 py-1 text-[10px] font-semibold text-rose-700">
+                        Jam mulai kosong
+                      </span>
+                    )}
+                    {overlapIds.has(selectedItem.id) && (
+                      <span className="rounded bg-amber-100 px-2 py-1 text-[10px] font-semibold text-amber-800">
+                        Overlap
+                      </span>
+                    )}
+                    {chainMismatchIds.has(selectedItem.id) && (
+                      <span className="rounded bg-sky-100 px-2 py-1 text-[10px] font-semibold text-sky-800">
+                        Belum sinkron
+                      </span>
+                    )}
+                    {selectedItem.durationMinutes > 0 &&
+                      selectedItem.start.trim() !== "" &&
+                      !overlapIds.has(selectedItem.id) &&
+                      !chainMismatchIds.has(selectedItem.id) && (
+                        <span className="rounded bg-emerald-100 px-2 py-1 text-[10px] font-semibold text-emerald-800">
+                          OK
+                        </span>
+                      )}
+                  </div>
+
+                  {/* Catatan */}
+                  <div className="mt-4">
+                    <label className="grid gap-1">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        Catatan
+                      </span>
+                      <textarea
+                        value={selectedItem.notes}
+                        onChange={(e) =>
+                          updateItem(selectedItem.id, (cur) => ({
+                            ...cur,
+                            notes: e.target.value,
+                          }))
+                        }
+                        rows={3}
+                        className="rounded-lg border border-slate-300 px-2 py-1.5 text-xs resize-y"
+                        placeholder="Catatan tambahan untuk item ini..."
+                      />
+                    </label>
+                  </div>
+
+                  <hr className="my-4 border-slate-200" />
+
+                  {/* Custom Fields */}
+                  <h2 className="text-sm font-semibold text-ink">
+                    Custom Field
+                  </h2>
+                  <div className="mt-3 grid gap-3">
                     {selectedItem.customFields.length === 0 && (
-                      <p className="text-sm text-slate-600">Belum ada field tambahan.</p>
+                      <p className="text-xs text-slate-500">
+                        Belum ada field tambahan.
+                      </p>
                     )}
                     {selectedItem.customFields.map((field) => (
-                      <div key={field.id} className="rounded-2xl border border-slate-200 p-3">
+                      <div
+                        key={field.id}
+                        className="rounded-2xl border border-slate-200 p-3"
+                      >
                         <label className="grid gap-1">
-                          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Label</span>
+                          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Label
+                          </span>
                           <input
                             value={field.key}
-                            onChange={(event) => updateCustomField(field.id, { key: event.target.value })}
+                            onChange={(e) =>
+                              updateCustomField(field.id, {
+                                key: e.target.value,
+                              })
+                            }
                             className="rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
                             placeholder="Contoh: Kebutuhan alat"
                           />
                         </label>
                         <label className="mt-2 grid gap-1">
-                          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Text</span>
+                          <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Text
+                          </span>
                           <textarea
                             value={field.value}
-                            onChange={(event) => updateCustomField(field.id, { value: event.target.value })}
+                            onChange={(e) =>
+                              updateCustomField(field.id, {
+                                value: e.target.value,
+                              })
+                            }
                             rows={2}
                             className="rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
                             placeholder="Isi detail tambahan"
@@ -556,7 +704,8 @@ export function RundownEditor({ initialRundown }: RundownEditorProps) {
                   <path d="M12 16v-4M12 8h.01" />
                 </svg>
                 <span>
-                  Draft AI akan <strong>menggantikan</strong> semua item yang ada. Simpan dulu jika perlu.
+                  Draft AI akan <strong>menggantikan</strong> semua item yang
+                  ada. Simpan dulu jika perlu.
                 </span>
               </div>
               <AiPromptPanel
