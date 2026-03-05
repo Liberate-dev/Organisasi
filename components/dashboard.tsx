@@ -84,7 +84,7 @@ export function Dashboard() {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-8 px-4 py-8 md:px-8">
       <section className="rounded-3xl border border-white/70 bg-gradient-to-br from-linen via-shell to-emerald-50 p-6 shadow-card md:p-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.26em] text-tide">Organisasi Mahasiswa</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.26em] text-tide">By David Augusto SI 23 - Last Gift</p>
         <h1 className="mt-3 text-3xl font-bold leading-tight text-ink md:text-4xl">
           Rundown Builder
         </h1>
