@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
+// Increase Vercel function timeout (default 10s is too short for AI calls)
+export const maxDuration = 30;
+
 // ─── Zod-style type for our structured output ─────────────────────────────
 // We validate manually (no extra deps) so we keep the bundle lean.
 type RawAiItem = {
@@ -171,7 +174,7 @@ async function generateWithOpenRouter(userPrompt: string): Promise<string> {
         headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${key}`,
-            "HTTP-Referer": "http://localhost:3000",
+            "HTTP-Referer": process.env.NEXT_PUBLIC_SITE_URL ?? "https://organisasi.vercel.app",
             "X-Title": "Rundown Builder AI",
         },
         body: JSON.stringify({
